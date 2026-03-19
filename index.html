@@ -1,26 +1,38 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+    <!-- 페이지 기본 설정: 문자 인코딩, 모바일 최적화 -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>J1939 RPM Control</title>
+
+    <!-- 게이지 라이브러리 불러오기 (canvas-gauges) -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-gauges@2.1.7/gauge.min.js"></script>
+
     <style>
+        /* 전체 화면을 검정 배경으로 설정하고, 글씨는 흰색 */
         body {
             margin: 0; padding: 0; background: #000; color: #fff;
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
             height: 100vh; overflow: hidden; display: flex; flex-direction: column;
         }
+
+        /* 메인 컨테이너: 내용물을 가운데 정렬하고 최대 너비 제한 */
         .container {
             flex: 1; padding: 10px; display: flex; flex-direction: column;
             max-width: 420px; margin: 0 auto;
         }
+
+        /* 상단 바: 상태 표시와 연결/해제 버튼 */
         .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        #status { font-size: 16px; font-weight: 600; color: #ff3b30; }
+        #status { font-size: 16px; font-weight: 600; color: #ff3b30; } /* 기본은 빨간색(연결 안 됨) */
+
         .conn-btn {
             background: #007aff; color: white; border: none;
             padding: 8px 16px; border-radius: 12px; font-weight: 600; cursor: pointer;
         }
+
+        /* 소스 주소 설정 영역 */
         .addr-bar {
             background: #1c1c1e; border-radius: 12px; padding: 12px 10px;
             margin-bottom: 12px;
@@ -29,6 +41,8 @@
             display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
         }
         .addr-label { font-size: 13px; color: #8e8e93; flex: 1; min-width: 80px; }
+
+        /* 셀렉트 박스와 숫자 입력창 스타일 */
         select, input[type="number"] {
             background: #2c2c2e; color: white; border: none;
             padding: 8px 12px; border-radius: 8px;
@@ -37,41 +51,51 @@
         select { flex: 1; max-width: 220px; }
         #customAddr {
             width: 90px; text-align: center;
-            display: none; /* 처음엔 숨김 */
+            display: none; /* 처음에는 숨김 */
         }
         #customAddr::placeholder { color: #666; }
+
         .set-btn { 
             background: #333; color: white; border: none; 
             padding: 8px 16px; border-radius: 8px; cursor: pointer; 
             font-weight: 600; width: 100%; margin-top: 8px;
         }
+
+        /* RPM 게이지 영역 */
         #gauge-container { position: relative; width: 320px; height: 320px; margin: 0 auto 16px; }
         #target-rpm {
             position: absolute; top: 77.5%; left: 50%; transform: translate(-50%, -50%);
             font-size: 29.4px; font-weight: 700; color: #fff; pointer-events: none; z-index: 10;
         }
+
+        /* BAUD RATE 버튼 영역 */
         .baud-bar { display: flex; gap: 10px; margin: 12px 0; }
         .baud-btn {
             flex: 1; background: #1c1c1e; color: #8e8e93; border: none;
             padding: 12px; border-radius: 10px; font-weight: 600; cursor: pointer;
         }
         .baud-btn.active { background: #007aff; color: white; }
+
+        /* 제어 버튼 그리드 (RESUME, UP, STOP, DOWN) */
         .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .ctrl-btn { padding: 18px; border: none; border-radius: 12px; font-size: 17px; font-weight: 700; color: white; cursor: pointer; }
-        #resume { background: #34c759; }
-        #up { background: #007aff; }
-        #stop { background: #ff3b30; }
-        #down { background: #ff9500; }
-        button:active { opacity: 0.8; transform: scale(0.95); }
+        #resume { background: #34c759; }  /* 녹색 */
+        #up     { background: #007aff; }  /* 파랑 */
+        #stop   { background: #ff3b30; }  /* 빨강 */
+        #down   { background: #ff9500; }  /* 주황 */
+        button:active { opacity: 0.8; transform: scale(0.95); } /* 누를 때 약간 작아지는 효과 */
     </style>
 </head>
 <body>
+
 <div class="container">
+    <!-- 상단: 연결 상태 + CONNECT/DISCONNECT 버튼 -->
     <div class="top-bar">
         <div id="status">Disconnected</div>
         <button class="conn-btn" id="mainBtn" onclick="toggleConnect()">CONNECT</button>
     </div>
 
+    <!-- 소스 주소 (ENGINE SA) 설정 영역 -->
     <div class="addr-bar">
         <div class="addr-row">
             <span class="addr-label">ENGINE SA</span>
@@ -88,6 +112,7 @@
                 </optgroup>
                 <option value="custom">직접 입력 (0~255)</option>
             </select>
+            <!-- 직접 입력할 때 나타나는 숫자 입력창 -->
             <input type="number" id="customAddr" class="custom-addr"
                    min="0" max="255" placeholder="0~255"
                    inputmode="numeric" pattern="[0-9]*">
@@ -95,16 +120,19 @@
         <button class="set-btn" onclick="setAddress()">SET</button>
     </div>
 
+    <!-- RPM 게이지 영역 -->
     <div id="gauge-container">
         <canvas id="gauge-rpm"></canvas>
-        <div id="target-rpm">0</div>
+        <div id="target-rpm">0</div> <!-- 중앙에 Target RPM 표시 -->
     </div>
 
+    <!-- BAUD RATE 선택 버튼 -->
     <div class="baud-bar">
         <button id="baud250" class="baud-btn active" onclick="changeBaud(250)">250 kbps</button>
         <button id="baud500" class="baud-btn" onclick="changeBaud(500)">500 kbps</button>
     </div>
 
+    <!-- 제어 버튼 4개 (2×2 그리드) -->
     <div class="control-grid">
         <button id="resume" class="ctrl-btn" onclick="sendCommand(1000)">RESUME</button>
         <button id="up" class="ctrl-btn">UP</button>
@@ -114,103 +142,135 @@
 </div>
 
 <script>
-    let bleDevice, bleChar;
-    const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-    const CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+    // ────────────────────────────────────────────────
+    // 전역 변수 선언
+    // ────────────────────────────────────────────────
+    let bleDevice;          // 연결된 블루투스 장치 객체
+    let bleChar;            // 읽기/쓰기할 특성(Characteristic) 객체
+    const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";   // ESP32에서 만든 서비스 UUID
+    const CHAR_UUID    = "beb5483e-36e1-4688-b7f5-ea07361b26a8";   // 읽기/쓰기할 특성 UUID
 
+    // 게이지 초기화 (canvas-gauges 라이브러리 사용)
     const gauge = new RadialGauge({
-        renderTo: 'gauge-rpm',
-        width: 320, height: 320, minValue: 0, maxValue: 3000,
-        majorTicks: ["0","500","1000","1500","2000","2500","3000"],
-        highlights: [{ from: 2500, to: 3000, color: "rgba(255,59,48,0.7)" }],
-        colorPlate: "#000", colorMajorTicks: "#ddd", colorNumbers: "#ccc",
-        needleType: "arrow", needleWidth: 4, needleColor: "#ff69b4",
-        valueBox: false, borderShadowWidth: 0, animationDuration: 200
+        renderTo: 'gauge-rpm',          // 캔버스 ID
+        width: 320, height: 320,        // 크기
+        minValue: 0, maxValue: 3000,    // RPM 범위
+        majorTicks: ["0","500","1000","1500","2000","2500","3000"], // 주요 눈금
+        highlights: [{ from: 2500, to: 3000, color: "rgba(255,59,48,0.7)" }], // 위험 구간 빨강
+        colorPlate: "#000",             // 배경색
+        colorMajorTicks: "#ddd",        // 눈금 색
+        colorNumbers: "#ccc",           // 숫자 색
+        needleType: "arrow",            // 바늘 모양
+        needleWidth: 4,                 // 바늘 굵기
+        needleColor: "#ff69b4",         // 바늘 색 (분홍)
+        valueBox: false,                // 기본 숫자 표시 끔 (우린 직접 target-rpm으로 표시)
+        borderShadowWidth: 0,           // 테두리 그림자 없음
+        animationDuration: 200          // 애니메이션 시간 (ms)
     }).draw();
 
+    // Target RPM에 따라 파란색 아크(진행 표시) 업데이트 함수
     function updateArc(target) {
         gauge.update({
             highlights: [
-                { from: 0, to: target, color: "rgba(0,122,255,0.6)" },
-                { from: 2500, to: 3000, color: "rgba(255,59,48,0.7)" }
+                { from: 0, to: target, color: "rgba(0,122,255,0.6)" }, // 파란색 아크
+                { from: 2500, to: 3000, color: "rgba(255,59,48,0.7)" } // 빨간 위험 구간
             ]
         });
     }
 
-    // 직접 입력 필드 보이기/숨기기
+    // "직접 입력" 선택 시 숫자 입력창 보이기/숨기기
     function toggleCustomInput() {
         const select = document.getElementById('sourceAddrSelect');
         const customInput = document.getElementById('customAddr');
         if (select.value === "custom") {
             customInput.style.display = "block";
-            customInput.focus();
+            customInput.focus(); // 바로 입력 가능하게 포커스
         } else {
             customInput.style.display = "none";
-            customInput.value = "";
+            customInput.value = ""; // 값 초기화
         }
     }
 
+    // CONNECT / DISCONNECT 토글 함수
     async function toggleConnect() {
+        // 이미 연결되어 있으면 해제
         if (bleDevice && bleDevice.gatt.connected) {
             await bleDevice.gatt.disconnect();
             updateStatus(false);
             return;
         }
+
+        // 연결 시도
         try {
+            // 블루투스 장치 선택 창 띄우기 (이름으로 필터링)
             bleDevice = await navigator.bluetooth.requestDevice({
                 filters: [{ name: "Truck_RPM_Control" }],
                 optionalServices: [SERVICE_UUID]
             });
+
+            // GATT 서버 연결
             const server = await bleDevice.gatt.connect();
             const service = await server.getPrimaryService(SERVICE_UUID);
             bleChar = await service.getCharacteristic(CHAR_UUID);
-            
+
+            // 알림(Notify) 구독 시작 → ESP32에서 데이터 올 때마다 handleNotify 호출
             await bleChar.startNotifications();
             bleChar.addEventListener('characteristicvaluechanged', handleNotify);
-            
-            updateStatus(true);
+
+            updateStatus(true); // UI 업데이트: Connected
         } catch (err) {
-            console.error(err);
+            console.error("연결 실패:", err);
             updateStatus(false);
         }
     }
 
+    // 연결 상태 UI 업데이트 함수
     function updateStatus(connected) {
         const s = document.getElementById('status');
         const b = document.getElementById('mainBtn');
         s.innerText = connected ? "Connected" : "Disconnected";
-        s.style.color = connected ? "#34c759" : "#ff3b30";
+        s.style.color = connected ? "#34c759" : "#ff3b30"; // 녹색 / 빨강
         b.innerText = connected ? "DISCONNECT" : "CONNECT";
     }
 
+    // ESP32에서 Notify로 데이터가 올 때마다 실행되는 함수
     function handleNotify(event) {
-        const dv = event.target.value;
-        if (dv.byteLength < 5) return;
-        const current = dv.getUint16(0, true);
-        const target = dv.getUint16(2, true);
-        const is500 = dv.getUint8(4) === 1;
-        gauge.value = current;
-        document.getElementById('target-rpm').innerText = target;
-        updateArc(target);
+        const dv = event.target.value; // DataView 객체
+        if (dv.byteLength < 5) return; // 데이터가 짧으면 무시
+
+        // 데이터 파싱 (little-endian)
+        const current = dv.getUint16(0, true); // 현재 RPM
+        const target  = dv.getUint16(2, true); // 목표 RPM
+        const is500   = dv.getUint8(4) === 1;  // 500kbps 여부
+
+        gauge.value = current;                      // 바늘 = 현재 RPM
+        document.getElementById('target-rpm').innerText = target; // 중앙 숫자 = 목표 RPM
+        updateArc(target);                          // 파란 아크 업데이트
+
+        // BAUD 버튼 활성화 상태 동기화
         document.getElementById('baud250').classList.toggle('active', !is500);
         document.getElementById('baud500').classList.toggle('active', is500);
     }
 
+    // ESP32로 명령 보내기 (2바이트 little-endian)
     async function sendCommand(val) {
         if (!bleChar) return alert("먼저 CONNECT 해주세요.");
         const buf = new Uint8Array([val & 0xFF, (val >> 8) & 0xFF]);
         await bleChar.writeValue(buf);
     }
 
+    // BAUD RATE 변경 명령
     function changeBaud(kbps) {
         sendCommand(kbps === 500 ? 0x5000 : 0x2500);
     }
 
+    // Source Address 설정 명령
     function setAddress() {
         const select = document.getElementById('sourceAddrSelect');
         const customInput = document.getElementById('customAddr').value.trim();
         let addr;
 
+        // 직접 입력 모드이고 값이 있으면 그걸 우선 사용
         if (select.value === "custom" && customInput !== "") {
             addr = parseInt(customInput);
             if (isNaN(addr) || addr < 0 || addr > 255) {
@@ -221,22 +281,24 @@
             addr = parseInt(select.value);
         }
 
-        sendCommand(0xA500 | addr);
+        sendCommand(0xA500 | addr); // ESP32가 인식할 명령 형식
     }
 
     // ────────────────────────────────────────────────
-    // UP / DOWN 버튼 장기 누름 시 반복 기능 추가
+    // UP / DOWN 버튼 장기 누름 시 RPM 연속 변경 기능
     // ────────────────────────────────────────────────
-    let repeatTimer = null;
+    let repeatTimer = null; // 반복 타이머 변수
 
+    // 반복 시작 함수
     function startRepeat(val) {
         if (repeatTimer) clearInterval(repeatTimer);
         sendCommand(val); // 처음 누를 때 즉시 1회 전송
         repeatTimer = setInterval(() => {
-            sendCommand(val);
-        }, 150); // 150ms마다 반복 (조절 가능: 100~200ms 추천)
+            sendCommand(val); // 150ms마다 반복 전송
+        }, 150); // 반복 간격 (150ms → 1초에 약 6~7회 증가/감소)
     }
 
+    // 반복 멈춤 함수
     function stopRepeat() {
         if (repeatTimer) {
             clearInterval(repeatTimer);
@@ -244,16 +306,16 @@
         }
     }
 
-    // UP 버튼
+    // UP 버튼 이벤트 등록
     const upBtn = document.getElementById('up');
-    upBtn.addEventListener('mousedown', () => startRepeat(1));
-    upBtn.addEventListener('mouseup', stopRepeat);
-    upBtn.addEventListener('mouseleave', stopRepeat);
-    upBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(1); });
+    upBtn.addEventListener('mousedown', () => startRepeat(1));     // 마우스 누를 때 시작
+    upBtn.addEventListener('mouseup', stopRepeat);                 // 떼면 멈춤
+    upBtn.addEventListener('mouseleave', stopRepeat);              // 마우스가 버튼 밖으로 나가도 멈춤
+    upBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(1); }); // 모바일 터치 시작
     upBtn.addEventListener('touchend', stopRepeat);
     upBtn.addEventListener('touchcancel', stopRepeat);
 
-    // DOWN 버튼
+    // DOWN 버튼 이벤트 등록
     const downBtn = document.getElementById('down');
     downBtn.addEventListener('mousedown', () => startRepeat(2));
     downBtn.addEventListener('mouseup', stopRepeat);
@@ -262,9 +324,9 @@
     downBtn.addEventListener('touchend', stopRepeat);
     downBtn.addEventListener('touchcancel', stopRepeat);
 
-    // 페이지 로드시 기본 상태 설정
+    // 페이지 로드 시 초기 상태 설정
     window.addEventListener('load', () => {
-        toggleCustomInput(); // 초기 상태에서 직접 입력 숨김
+        toggleCustomInput(); // "직접 입력" 숨김 처리
     });
 </script>
 </body>
