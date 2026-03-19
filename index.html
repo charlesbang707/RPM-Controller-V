@@ -92,7 +92,7 @@
                    min="0" max="255" placeholder="0~255"
                    inputmode="numeric" pattern="[0-9]*">
         </div>
-        <button class="set-btn" onclick="setAddress()">SET ADDRESS</button>
+        <button class="set-btn" onclick="setAddress()">SET</button>
     </div>
 
     <div id="gauge-container">
@@ -107,9 +107,9 @@
 
     <div class="control-grid">
         <button id="resume" class="ctrl-btn" onclick="sendCommand(1000)">RESUME</button>
-        <button id="up" class="ctrl-btn" onclick="sendCommand(1)">UP</button>
+        <button id="up" class="ctrl-btn">UP</button>
         <button id="stop" class="ctrl-btn" onclick="sendCommand(600)">STOP</button>
-        <button id="down" class="ctrl-btn" onclick="sendCommand(2)">DOWN</button>
+        <button id="down" class="ctrl-btn">DOWN</button>
     </div>
 </div>
 
@@ -223,6 +223,44 @@
 
         sendCommand(0xA500 | addr);
     }
+
+    // ────────────────────────────────────────────────
+    // UP / DOWN 버튼 장기 누름 시 반복 기능 추가
+    // ────────────────────────────────────────────────
+    let repeatTimer = null;
+
+    function startRepeat(val) {
+        if (repeatTimer) clearInterval(repeatTimer);
+        sendCommand(val); // 처음 누를 때 즉시 1회 전송
+        repeatTimer = setInterval(() => {
+            sendCommand(val);
+        }, 150); // 150ms마다 반복 (조절 가능: 100~200ms 추천)
+    }
+
+    function stopRepeat() {
+        if (repeatTimer) {
+            clearInterval(repeatTimer);
+            repeatTimer = null;
+        }
+    }
+
+    // UP 버튼
+    const upBtn = document.getElementById('up');
+    upBtn.addEventListener('mousedown', () => startRepeat(1));
+    upBtn.addEventListener('mouseup', stopRepeat);
+    upBtn.addEventListener('mouseleave', stopRepeat);
+    upBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(1); });
+    upBtn.addEventListener('touchend', stopRepeat);
+    upBtn.addEventListener('touchcancel', stopRepeat);
+
+    // DOWN 버튼
+    const downBtn = document.getElementById('down');
+    downBtn.addEventListener('mousedown', () => startRepeat(2));
+    downBtn.addEventListener('mouseup', stopRepeat);
+    downBtn.addEventListener('mouseleave', stopRepeat);
+    downBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(2); });
+    downBtn.addEventListener('touchend', stopRepeat);
+    downBtn.addEventListener('touchcancel', stopRepeat);
 
     // 페이지 로드시 기본 상태 설정
     window.addEventListener('load', () => {
